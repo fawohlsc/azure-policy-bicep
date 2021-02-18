@@ -1,0 +1,100 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-08-01/managementGroupDeploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "variables": {
+        // Built-in role 'Redis Contributor'.
+        "roleDefinitionId": "/providers/microsoft.authorization/roleDefinitions/e0f68234-74aa-48ed-b826-c38b57376e17"
+    },
+    "resources": [
+        // Policy definition 'Deploy-Redis-FirewallRule'.
+        {
+            "name": "Deploy-Redis-FirewallRule",
+            "type": "Microsoft.Authorization/policyDefinitions",
+            "apiVersion": "2020-03-01",
+            "properties": {
+                "policyType": "Custom",
+                "mode": "All",
+                "displayName": "Deploy-Redis-FirewallRule",
+                "description": "Deploys Redis firewall rule.",
+                "metadata": {
+                    "category": "Cache"
+                },
+                "parameters": {
+                    "firewallRule": {
+                        "type": "Object",
+                        "metadata": {
+                            "displayName": "Firewall Rule",
+                            "description": "The firewall rules to deploy."
+                        }
+                    }
+                },
+                "policyRule": {
+                    "if": {
+                        "field": "type",
+                        "equals": "Microsoft.Cache/Redis"
+                    },
+                    "then": {
+                        "effect": "deployIfNotExists",
+                        "details": {
+                            "type": "Microsoft.Cache/Redis/firewallRules",
+                            "roleDefinitionIds": [
+                                "[variables('roleDefinitionId')]"
+                            ],
+                            // Does the firewall rule already exist?
+                            "existenceCondition": {
+                                "allOf": [
+                                    {
+                                        "field": "Microsoft.Cache/Redis/firewallRules/startIP",
+                                        "equals": "[[parameters('firewallRule').startIP]"
+                                    },
+                                    {
+                                        "field": "Microsoft.Cache/Redis/firewallRules/endIP",
+                                        "equals": "[[parameters('firewallRule').endIP]"
+                                    }
+                                ]
+                            },
+                            "deployment": {
+                                "properties": {
+                                    "mode": "incremental",
+                                    "parameters": {
+                                        "redisName": {
+                                            "value": "[[field('name')]"
+                                        },
+                                        "firewallRule": {
+                                            "value": "[[parameters('firewallRule')]"
+                                        }
+                                    },
+                                    "template": {
+                                        "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                                        "contentVersion": "1.0.0.0",
+                                        "parameters": {
+                                            "redisName": {
+                                                "type": "string"
+                                            },
+                                            "firewallRule": {
+                                                "type": "Object"
+                                            }
+                                        },
+                                        "resources": [
+                                            {
+                                                // Child resources need to be prefixed with the name of the parent resource.
+                                                "name": "[[concat(parameters('redisName'), '/', parameters('firewallRule').name)]",
+                                                "type": "Microsoft.Cache/Redis/firewallRules",
+                                                "apiVersion": "2019-07-01",
+                                                "properties": {
+                                                    "startIP": "[[parameters('firewallRule').startIP]",
+                                                    "endIP": "[[parameters('firewallRule').endIP]"
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ],
+    "outputs": {}
+}
